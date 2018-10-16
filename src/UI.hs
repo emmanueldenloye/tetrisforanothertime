@@ -65,6 +65,11 @@ main r c keyboardConfig = do
   g <- (`startGame` (either (const (defaultBoard)) id (makeBoard r c))) <$> newStdGen
   void $ customMain (V.mkVty V.defaultConfig) (Just chan) (createApp keyboardConfig) g
 
+ifnotPaused g =
+  case view status g of
+    Running -> continue . id
+    Paused -> continue . const g
+    Done -> halt
 
 handleEventQwerty ::
      GameState
@@ -72,16 +77,16 @@ handleEventQwerty ::
   -> EventM () (Next GameState)
 handleEventQwerty g =
   \case
-    (AppEvent Tick) -> continue $ ifnotPaused g $ move MDown g
-    (VtyEvent (V.EvKey (V.KChar 'j') [])) -> continue $ ifnotPaused g $ move MClockwise g
-    (VtyEvent (V.EvKey (V.KChar 'f') [])) -> continue $ ifnotPaused g $ move MCounterClockwise g
-    (VtyEvent (V.EvKey (V.KChar 'd') [])) -> continue $ ifnotPaused g $ move MLeft g
-    (VtyEvent (V.EvKey (V.KChar 'k') [])) -> continue $ ifnotPaused g $ move MRight g
-    (VtyEvent (V.EvKey (V.KChar 'o') [])) -> continue $ ifnotPaused g $ move MDown g
+    (AppEvent Tick) -> ifnotPaused g $ move MDown g
+    (VtyEvent (V.EvKey (V.KChar 'j') [])) -> ifnotPaused g $ move MClockwise g
+    (VtyEvent (V.EvKey (V.KChar 'f') [])) -> ifnotPaused g $ move MCounterClockwise g
+    (VtyEvent (V.EvKey (V.KChar 'd') [])) -> ifnotPaused g $ move MLeft g
+    (VtyEvent (V.EvKey (V.KChar 'k') [])) -> ifnotPaused g $ move MRight g
+    (VtyEvent (V.EvKey (V.KChar 'o') [])) -> ifnotPaused g $ move MDown g
     (VtyEvent (V.EvKey (V.KChar 'q') [])) -> halt g
     (VtyEvent (V.EvKey (V.KChar 'p') [])) -> continue $ togglePause g
     (VtyEvent (V.EvKey V.KEsc [])) -> halt g
-    _ -> continue g
+    _ -> ifnotPaused g g
 
 handleEventDvorak ::
      GameState
@@ -89,16 +94,16 @@ handleEventDvorak ::
   -> EventM () (Next GameState)
 handleEventDvorak g =
   \case
-    (AppEvent Tick) -> continue $ ifnotPaused g $ move MDown g
-    (VtyEvent (V.EvKey (V.KChar 'h') [])) -> continue $ ifnotPaused g $ move MClockwise g
-    (VtyEvent (V.EvKey (V.KChar 'u') [])) -> continue $ ifnotPaused g $ move MCounterClockwise g
-    (VtyEvent (V.EvKey (V.KChar 'e') [])) -> continue $ ifnotPaused g $ move MLeft g
-    (VtyEvent (V.EvKey (V.KChar 't') [])) -> continue $ ifnotPaused g $ move MRight g
-    (VtyEvent (V.EvKey (V.KChar 'r') [])) -> continue $ ifnotPaused g $ move MDown g
+    (AppEvent Tick) -> ifnotPaused g $ move MDown g
+    (VtyEvent (V.EvKey (V.KChar 'h') [])) -> ifnotPaused g $ move MClockwise g
+    (VtyEvent (V.EvKey (V.KChar 'u') [])) -> ifnotPaused g $ move MCounterClockwise g
+    (VtyEvent (V.EvKey (V.KChar 'e') [])) -> ifnotPaused g $ move MLeft g
+    (VtyEvent (V.EvKey (V.KChar 't') [])) -> ifnotPaused g $ move MRight g
+    (VtyEvent (V.EvKey (V.KChar 'r') [])) -> ifnotPaused g $ move MDown g
     (VtyEvent (V.EvKey (V.KChar 'q') [])) -> halt g
-    (VtyEvent (V.EvKey (V.KChar 'p') [])) -> continue $ togglePause g
+    (VtyEvent (V.EvKey (V.KChar 'p') [])) -> continue (togglePause g)
     (VtyEvent (V.EvKey V.KEsc [])) -> halt g
-    _ -> continue g
+    _ -> ifnotPaused g g
 
 drawUI :: GameState -> [Widget ()]
 drawUI g =
@@ -107,7 +112,7 @@ drawUI g =
 drawStats :: GameState -> Widget ()
 drawStats g =
   hLimit 11 $
-  vBox [drawScore (g ^. rowsCleared), padTop (Pad 2) $ drawGameOver (gameover g)]
+  vBox [drawScore (g ^. rowsCleared), padTop (Pad 2) $ drawGameOver (checkgameover g)]
 
 drawScore :: Int -> Widget ()
 drawScore n =

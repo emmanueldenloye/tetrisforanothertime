@@ -73,19 +73,19 @@ move m g =
   in checks g boundary newstate
   where
     checks gg b ns
-      | atBottom ns = freezePiece gg
+      | atBottom gg ns = freezePiece gg
       | otherwise =
         case overlaps ns gg of
           Just True -> freezePiece gg
           Just False -> ns
           Nothing -> gg
 
-atBottom :: GameState -> Bool
-atBottom g =
-  let (V2 posc posr) = view (curpiece . pos) g
-      mc = fmap (posc -) $ minimumOf (curpiece . tiles . traverse . _x) g
-  in case mc of
-       Just c -> c == -1
+atBottom :: GameState -> GameState -> Bool
+atBottom old new =
+  let (V2 newposc newposr) = view (curpiece . pos) new
+      newcs = map (newposc -) $ new ^.. curpiece . tiles . traverse . _y
+      b = fst $ fst $ bounds $ view board old
+  in any (< b) newcs
 
 overlaps :: GameState -> GameState -> Maybe Bool
 overlaps new old =
@@ -131,18 +131,16 @@ actualPiece g =
       ts = view (curpiece . tiles) g
   in over (mapped . _y) ((-) pr) (over (mapped . _x) ((-) pc) ts)
 
-gameover :: GameState -> Bool
-gameover = const $ False
+gameover :: GameState -> GameState
+gameover g =
+         let b =  view board g
+             ((_, bottomcolumn), (toprow, topcolumn)) = bounds $ b
+             cond = or $ liftA2 (\r c -> Filled == b ! (r,c)) [toprow, toprow - 1 , toprow - 2] [bottomcolumn .. topcolumn]
+         in if cond then set status Done g else g
 
-
-doneGame = undefined
-
-ifnotPaused :: GameState -> (GameState -> GameState)
-ifnotPaused g =
-  case view status g of
-    Paused -> const g
-    Done -> const doneGame
-    Running -> id
+checkgameover g = let b =  view board g
+                      ((_, bottomcolumn), (toprow, topcolumn)) = bounds $ b
+         in or $ liftA2 (\r c -> Filled == b ! (r,c)) [toprow, toprow - 1 , toprow - 2] [bottomcolumn .. topcolumn]
 
 togglePause :: GameState -> GameState
 togglePause g =
