@@ -3,7 +3,7 @@
 
 module UI where
 
-import Control.Monad (forever, void)
+import Control.Monad (forever, void,liftM2)
 import Control.Monad.IO.Class (liftIO)
 import Control.Concurrent (threadDelay, forkIO)
 import Data.Maybe (fromMaybe)
@@ -32,6 +32,7 @@ import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
 import qualified Graphics.Vty as V
+import Utility
 
 data Tick = Tick
 
@@ -62,12 +63,13 @@ main r c keyboardConfig = do
     forever $ do
       writeBChan chan Tick
       threadDelay 1000000
-  g <- (`startGame` (either (const (defaultBoard)) id (makeBoard r c))) <$> newStdGen
+  g <- liftM2 (\a b -> startGame a b (either (const (defaultBoard)) id (makeBoard r c))) newStdGen newStdGen
+  -- g <- (`startGame` (either (const (defaultBoard)) id (makeBoard r c))) <$> newStdGen newStdGen
   void $ customMain (V.mkVty V.defaultConfig) (Just chan) (createApp keyboardConfig) g
 
 ifnotPaused g =
   case view status g of
-    Running -> continue . id
+    Running -> continue
     Paused -> continue . const g
     Done -> halt
 
@@ -95,8 +97,8 @@ handleEventDvorak ::
 handleEventDvorak g =
   \case
     (AppEvent Tick) -> ifnotPaused g $ move MDown g
-    (VtyEvent (V.EvKey (V.KChar 'h') [])) -> ifnotPaused g $ move MClockwise g
-    (VtyEvent (V.EvKey (V.KChar 'u') [])) -> ifnotPaused g $ move MCounterClockwise g
+    (VtyEvent (V.EvKey (V.KChar 'u') [])) -> ifnotPaused g $ move MClockwise g
+    (VtyEvent (V.EvKey (V.KChar 'h') [])) -> ifnotPaused g $ move MCounterClockwise g
     (VtyEvent (V.EvKey (V.KChar 'e') [])) -> ifnotPaused g $ move MLeft g
     (VtyEvent (V.EvKey (V.KChar 't') [])) -> ifnotPaused g $ move MRight g
     (VtyEvent (V.EvKey (V.KChar 'r') [])) -> ifnotPaused g $ move MDown g
@@ -135,7 +137,8 @@ drawGrid gg =
     tilesInRow y = [drawCoord (y, x) | x <- [0 .. width]]
     (height, width) = snd $ bounds $ view board g
     drawCoord = drawTile g . tileAt
-    tileAt = (view board g !)
+    tileAt (r,c) = debugArrayIndex ("at drawGrid: tried to access " ++ show (r,c)) (view board g) (r,c)
+--    tileAt = (view board g !)
 
 updateMovingPiece :: GameState -> GameState
 updateMovingPiece g =
@@ -147,7 +150,8 @@ updateMovingPiece g =
     drawPiece b p (V2 posc posr) =
       let rs = p ^.. tiles . traverse . _x
           cs = p ^.. tiles . traverse . _y
-      in b // (zipWith (\r c -> ((posc - c, posr - r), HasMovingPiece)) rs cs)
+      in debugArraySet "at updateMovingPiece" b (zipWith (\r c -> ((posc - c, posr - r), HasMovingPiece)) rs cs)
+      -- in b // (zipWith (\r c -> ((posc - c, posr - r), HasMovingPiece)) rs cs)
 
 preRefreshPiece :: Board -> Board
 preRefreshPiece = fmap go
@@ -160,45 +164,43 @@ preRefreshPiece = fmap go
 drawTile :: GameState -> Tile -> Widget ()
 drawTile g =
   \case
-    Filled -> withAttr (currentpieceAttr (view (curpiece . shape) g)) (str " ")
+    Filled colour -> withAttr (colorAttr colour) (str " ")
     Unfilled -> withAttr backgroundAttr (str " ")
     HasMovingPiece ->
-      withAttr (currentpieceAttr (view (curpiece . shape) g)) (str " ")
+      withAttr (colorAttr (view (curpiece . color) g)) (str " ")
 
-currentpieceAttr =
+colorAttr =
   \case
-    I -> iattr
-    L -> lattr
-    J -> jattr
-    T -> tattr
-    O -> oattr
-    S -> sattr
-    Z -> zattr
+    CBlue -> cblue
+    CWhite -> cwhite
+    CYellow -> cyellow
+    CMagenta -> cmagenta
+    CCyan -> ccyan
+    CGreen -> cgreen
+    CRed -> cred
+    Background -> backgroundAttr
 
-iattr, lattr, jattr, tattr, oattr, sattr, zattr :: AttrName
-backgroundAttr :: AttrName
+cblue, cwhite, cyellow, cmagenta, ccyan, cgreen, cred, backgroundAttr :: AttrName
 
-iattr = "iattr"
-lattr = "lattr"
-jattr = "jattr"
-tattr = "tattr"
-oattr = "oattr"
-sattr = "sattr"
-zattr = "zattr"
-
-
+cblue = "cblue"
+cwhite = "cwhite"
+cyellow = "cyellow"
+cmagenta = "cmagenta"
+ccyan = "ccyan"
+cgreen = "cgreen"
+cred = "cred"
 backgroundAttr = "backgroundAttr"
 
 theMap :: AttrMap
 theMap =
   attrMap
     V.defAttr
-    [ (iattr, V.blue `on` V.blue)
-    , (lattr, V.white `on` V.white)
-    , (jattr, V.yellow `on` V.yellow)
-    , (tattr, V.magenta `on` V.magenta)
-    , (oattr, V.cyan `on` V.cyan)
-    , (sattr, V.green `on` V.green)
-    , (zattr, V.red `on` V.red)
+    [ (cblue, V.blue `on` V.blue)
+    , (cwhite, V.white `on` V.white)
+    , (cyellow, V.yellow `on` V.yellow)
+    , (cmagenta, V.magenta `on` V.magenta)
+    , (ccyan, V.cyan `on` V.cyan)
+    , (cgreen, V.green `on` V.green)
+    , (cred, V.red `on` V.red)
     , (backgroundAttr, V.black `on` V.black)
     ]
