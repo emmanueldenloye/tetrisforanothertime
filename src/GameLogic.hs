@@ -5,7 +5,6 @@
 module GameLogic where
 
 import Control.Applicative
-
 import Control.Lens
 import Control.Monad.RWS
 import Data.Array
@@ -211,7 +210,7 @@ togglePause g =
 
 makeBoard :: Int -> Int -> Either LogicError Board
 makeBoard numRows numColumns
-  | numRows > 10 || numColumns > 10 = Left BoardError -- can you really have any fun with a smaller board?
+  | numRows < 10 || numColumns < 10 = Left BoardError -- can you really have any fun with a smaller board?
   | otherwise =
     Right $ listArray ((0, 0), (numRows - 1, numColumns - 1)) (repeat Unfilled)
 
