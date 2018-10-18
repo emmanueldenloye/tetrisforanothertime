@@ -80,8 +80,8 @@ handleEventQwerty ::
 handleEventQwerty g =
   \case
     (AppEvent Tick) -> ifnotPaused g $ move MDown g
-    (VtyEvent (V.EvKey (V.KChar 'j') [])) -> ifnotPaused g $ move MClockwise g
-    (VtyEvent (V.EvKey (V.KChar 'f') [])) -> ifnotPaused g $ move MCounterClockwise g
+    (VtyEvent (V.EvKey (V.KChar 'j') [])) -> ifnotPaused g $ move MCounterClockwise g
+    (VtyEvent (V.EvKey (V.KChar 'f') [])) -> ifnotPaused g $ move MClockwise g
     (VtyEvent (V.EvKey (V.KChar 'd') [])) -> ifnotPaused g $ move MLeft g
     (VtyEvent (V.EvKey (V.KChar 'k') [])) -> ifnotPaused g $ move MRight g
     (VtyEvent (V.EvKey (V.KChar 'o') [])) -> ifnotPaused g $ move MDown g

@@ -101,7 +101,6 @@ move mv g =
                case mv of
                     MDown -> freezePiece gg
                     MNull -> freezePiece gg
-                    _ -> gg
           Just (_, False) -> ns
           Nothing -> gg
 
