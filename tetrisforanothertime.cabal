@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0c15397d7071e5cedfbea5c59ef052848f3e9631519fee7f5dead1fa34a7ffef
+-- hash: afb41e66cefa56c8df9ae78f65e474e0c692b410be22f054ef4d8559c8edad20
 
 name:           tetrisforanothertime
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
       Lib
       Types
       UI
+      Utility
   other-modules:
       Paths_tetrisforanothertime
   hs-source-dirs:

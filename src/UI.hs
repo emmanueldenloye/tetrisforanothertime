@@ -114,7 +114,7 @@ drawUI g =
 drawStats :: GameState -> Widget ()
 drawStats g =
   hLimit 11 $
-  vBox [drawScore (g ^. rowsCleared), padTop (Pad 2) $ drawGameOver (checkgameover g)]
+  vBox [drawScore (g ^. rowsCleared), padTop (Pad 2) $ drawGameOver (Done == view status g)]
 
 drawScore :: Int -> Widget ()
 drawScore n =
@@ -132,7 +132,7 @@ drawGrid :: GameState -> Widget ()
 drawGrid gg =
   withBorderStyle BS.unicodeBold $ B.borderWithLabel (str "Tetris") $ vBox rows
   where
-    g = updateMovingPiece gg
+    g = if view status gg == Done  then gg else updateMovingPiece gg
     rows = [hBox $ tilesInRow r | r <- [height , height - 1 ..  0]]
     tilesInRow y = [drawCoord (y, x) | x <- [0 .. width]]
     (height, width) = snd $ bounds $ view board g

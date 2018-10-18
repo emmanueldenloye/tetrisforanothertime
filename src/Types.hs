@@ -7,6 +7,7 @@ import Data.Array
 import System.Random
 import Control.Lens
 import Linear
+import qualified Data.Map as M
 import Graphics.Vty
 import Control.Monad.RWS
 
@@ -20,7 +21,7 @@ data Shape
   | O
   | S
   | Z
-  deriving (Eq, Enum, Show)
+  deriving (Eq, Ord, Enum, Show)
 
 data MovingPiece
 
@@ -32,6 +33,8 @@ data Movement
   | MCounterClockwise
   | MClockwise
   | MDown
+  | MNull
+  deriving (Show, Eq)
 
 type Piece = GenericPiece Int
 
@@ -60,7 +63,9 @@ data Status
   = Running
   | Paused
   | Done
-  deriving (Show)
+  deriving (Eq,Show)
+
+type RotationMap = M.Map Shape (Int, Array Int (M42 Int))
 
 data GameState = GameState
   { _board :: Board
@@ -69,6 +74,8 @@ data GameState = GameState
   , _pieceColourGenerator :: StdGen
   , _curpiece :: Piece
   , _status :: Status
+  , _rotmap :: RotationMap
+  , _movement :: Movement
   } deriving (Show)
 
 makeLenses ''GameState
