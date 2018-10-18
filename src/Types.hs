@@ -1,17 +1,21 @@
 -- | Contains core data-types
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveFunctor #-}
+
 module Types where
 
-import Data.Array
-import System.Random
 import Control.Lens
-import Linear
+import Control.Monad.RWS
+import Data.Array
 import qualified Data.Map as M
 import Graphics.Vty
-import Control.Monad.RWS
+import Linear
+import System.Random
 
-data KeyboardConfig = Qwerty | Dvorak deriving (Read, Show)
+data KeyboardConfig
+  = Qwerty
+  | Dvorak
+  deriving (Read, Show)
 
 data Shape
   = I
@@ -38,9 +42,18 @@ data Movement
 
 type Piece = GenericPiece Int
 
-data PieceColor = CBlue | CWhite | CYellow | CMagenta | CCyan | CGreen | CRed | Background deriving (Eq, Enum, Show)
+data PieceColor
+  = CBlue
+  | CWhite
+  | CYellow
+  | CMagenta
+  | CCyan
+  | CGreen
+  | CRed
+  | Background
+  deriving (Eq, Enum, Show)
 
-data GenericPiece a  = GenericPiece
+data GenericPiece a = GenericPiece
   { _tiles :: M42 a
   , _shape :: Shape
   , _pos :: V2 Int
@@ -49,10 +62,9 @@ data GenericPiece a  = GenericPiece
 
 makeLenses ''GenericPiece
 
-type Board = Array (Int,Int) Tile
+type Board = Array (Int, Int) Tile
 
 -- type PieceColor = String -- using hex codes is probably better, but that'll do!!!
-
 data Tile
   = Filled PieceColor
   | Unfilled
@@ -63,7 +75,7 @@ data Status
   = Running
   | Paused
   | Done
-  deriving (Eq,Show)
+  deriving (Eq, Show)
 
 type RotationMap = M.Map Shape (Int, Array Int (M42 Int))
 
