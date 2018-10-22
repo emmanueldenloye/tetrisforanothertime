@@ -24,7 +24,7 @@ If you are using the Qwerty keyboard, the controls are:
   * o <- Move piece down
   * q or ESC <- quit game
   * p <- Pause game
-  * <space> <- "Fastfall" pieces
+  * SPACE <- "Fastfall" pieces
 
 
 For those weirdos out there that use Dvorak (this is mostly
@@ -37,7 +37,7 @@ self-deprecation), the Dvorak controls:
   * r <- Move piece down
   * q or ESC <- quit game
   * p <- Pause game
-  * <space> <- "Fastfall" pieces
+  * SPACE <- "Fastfall" pieces
 
 ## Some notes
 
