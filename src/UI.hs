@@ -22,7 +22,6 @@ import Data.Maybe (fromMaybe)
 import Debug.Trace
 import GameLogic
 import qualified Graphics.Vty as V
-import qualified Graphics.Vty as V
 import Linear
 import Numeric.Natural
 import System.Random
@@ -90,6 +89,7 @@ handleEventQwerty g =
     (VtyEvent (V.EvKey (V.KChar 'd') [])) -> ifnotPaused g $ move MLeft g
     (VtyEvent (V.EvKey (V.KChar 'k') [])) -> ifnotPaused g $ move MRight g
     (VtyEvent (V.EvKey (V.KChar 'o') [])) -> ifnotPaused g $ move MDown g
+    (VtyEvent (V.EvKey (V.KChar ' ') [])) -> ifnotPaused g $ move MFastDown g
     (VtyEvent (V.EvKey (V.KChar 'q') [])) -> halt g
     (VtyEvent (V.EvKey (V.KChar 'p') [])) -> continue $ togglePause g
     (VtyEvent (V.EvKey V.KEsc [])) -> halt g
@@ -106,6 +106,7 @@ handleEventDvorak g =
     (VtyEvent (V.EvKey (V.KChar 'e') [])) -> ifnotPaused g $ move MLeft g
     (VtyEvent (V.EvKey (V.KChar 't') [])) -> ifnotPaused g $ move MRight g
     (VtyEvent (V.EvKey (V.KChar 'r') [])) -> ifnotPaused g $ move MDown g
+    (VtyEvent (V.EvKey (V.KChar ' ') [])) -> ifnotPaused g $ move MFastDown g
     (VtyEvent (V.EvKey (V.KChar 'q') [])) -> halt g
     (VtyEvent (V.EvKey (V.KChar 'p') [])) -> continue (togglePause g)
     (VtyEvent (V.EvKey V.KEsc [])) -> halt g

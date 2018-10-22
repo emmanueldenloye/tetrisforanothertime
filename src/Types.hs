@@ -37,6 +37,7 @@ data Movement
   | MCounterClockwise
   | MClockwise
   | MDown
+  | MFastDown
   | MNull
   deriving (Show, Eq)
 

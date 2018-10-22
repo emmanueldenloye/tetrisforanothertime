@@ -30,6 +30,7 @@ dependencies:
 - brick
 - containers
 - optparse-applicative
+- monad-loops
 
 library:
   source-dirs: src

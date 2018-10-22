@@ -11,7 +11,7 @@ debugArrayIndex err board i =
   let bs = bounds board
   in if inRange bs i
        then board ! i
-       else error (err ++ show (bounds board))
+       else error (err ++ show i ++ " " ++ show (bounds board))
 
 debugArraySet :: ErrorMessage -> Board -> [((Int, Int), Tile)] -> Board
 debugArraySet err board ps =

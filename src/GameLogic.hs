@@ -7,10 +7,12 @@ module GameLogic where
 import Control.Applicative
 import Control.Lens
 import Control.Monad.RWS
+import Control.Monad.State
 import Data.Array
 import Data.Bifunctor
 import Data.Bool
 import Data.Coerce
+import Debug.Trace
 import Data.Foldable
 import Data.Function
 import Data.List
@@ -18,7 +20,6 @@ import qualified Data.Map as M
 import Data.Maybe
 import Data.Monoid
 import Data.Ord
-import Debug.Trace
 import Graphics.Vty
 import Linear
 import System.Random
@@ -27,11 +28,12 @@ import Utility
 
 startGame :: StdGen -> StdGen -> Board -> GameState
 startGame pieceGen colorGen b =
-  let (shape, newg1) = randomR (0, 6) pieceGen
-      (colourNum, newg2) = randomR (0, 6) colorGen
-      position = uncurry V2 $ bimap id ((+ 2) . (`div` 2)) $ snd $ bounds b
-      piece = makePiece (toEnum shape) position (toEnum colourNum)
-  in GameState b 0 newg1 newg2 piece Running initRotationMap MNull
+  GameState b 0 newg1 newg2 piece Running initRotationMap MNull
+  where
+    (shape, newg1) = randomR (0, 6) pieceGen
+    (colourNum, newg2) = randomR (0, 6) colorGen
+    position = uncurry V2 $ bimap id ((+ 2) . (`div` 2)) $ snd $ bounds b
+    piece = makePiece (toEnum shape) position (toEnum colourNum)
 
 clearRows :: V2 Int -> Board -> (Maybe Int, Board)
 clearRows (V2 posr posc) b =
@@ -52,16 +54,12 @@ clearRows (V2 posr posc) b =
     rowsToClear =
       filter
         (\r -> all (\c -> isFilled $ b ! (r, c)) [bc .. tc])
-        -- (\r -> all (\c -> isFilled $ debugArrayIndex err1 b (r, c)) [bc .. tc])
         rowRange
     numRowsToClear = length rowsToClear
-    err1 = "at clearRows: at rowsClear"
-    err2 = "at clearRows: at maxrow"
     maxrow =
       if not $ null (rowsToClear)
         then Just $ maximum rowsToClear
         else Nothing
-          -- (debugArraySet err2 b (liftA2 (\x y -> ((y, x), Unfilled)) [bc .. tc] rowsToClear))
     -- rowRange = [max (posr - 2) br .. min tr (posr + 2)]
       -- filter (\r -> all (\c -> Filled == b ! (r, c)) [bc .. tc]) rowRange
 
@@ -69,40 +67,59 @@ isFilled (Filled _) = True
 isFilled _ = False
 
 move :: Movement -> GameState -> GameState
-move mv g =
-  let boundary = bounds $ view board g
-      newstate =
-        case mv of
-          MRight ->
-            set movement mv (over curpiece (unsafeMovePieceHorizontally 1) g)
-          MLeft ->
-            set movement mv (over curpiece (unsafeMovePieceHorizontally (-1)) g)
-          MCounterClockwise ->
-            let p = view curpiece g
-                m = view rotmap g
-                (m', p') = unsafeCounterclockwiseRotation m p
-            in set movement mv (set rotmap m' ((set curpiece p') g))
-          MClockwise ->
-            let p = view curpiece g
-                m = view rotmap g
-                (m', p') = unsafeClockwiseRotation m p
-            in set movement mv (set rotmap m' ((set curpiece p') g))
-          MDown ->
-            set movement mv (over curpiece unsafeMovePieceVerticallyDown g)
-  in checks g boundary newstate
+move mv = checksWithFastDown <*> execState go
   where
-    checks gg b ns
-      | atBottom gg ns = freezePiece gg
-      | checkgameover ns = set status Done gg
+    go = do
+      case mv of
+        MRight -> curpiece %= (unsafeMovePieceHorizontally 1)
+        MLeft -> curpiece %= (unsafeMovePieceHorizontally (-1))
+        MCounterClockwise -> do
+          p <- use curpiece
+          m <- use rotmap
+          let (m',p') = unsafeCounterclockwiseRotation m p
+          curpiece .= p'
+          rotmap .= m'
+        MClockwise -> do
+          p <- use curpiece
+          m <- use rotmap
+          let (m',p') = unsafeClockwiseRotation m p
+          curpiece .= p'
+          rotmap .= m'
+        MDown -> curpiece %= unsafeMovePieceVerticallyDown
+        MFastDown -> state $ ((,) ()) . findBottomOFrozenPiece
+      movement .= mv
+    checksWithFastDown old new =
+        case view movement new of
+            MFastDown -> freezePiece new
+            _ -> checks old new
+    checks old new
+      | atBottom old new = freezePiece old
+      | checkgameover new = set status Done old
       | otherwise =
-        case overlaps ns gg of
+        case overlaps new old of
           Just (mv, True) ->
             case mv of
-              MDown -> freezePiece gg
-              MNull -> freezePiece gg
-              _ -> gg
-          Just (_, False) -> ns
-          Nothing -> gg
+              MDown -> freezePiece old
+              MNull -> freezePiece old
+              _ -> old
+          Just (_, False) -> new
+          Nothing -> old
+
+findBottomOFrozenPiece =
+  ((curpiece . pos . _x) +~ 1) .
+  until
+    ((||) <$> (not . liftA2 inBoard (views board bounds) actualPiece) <*>
+     (evalState go))
+    ((curpiece . pos . _x) -~ 1)
+  where
+    go = do
+      ps <- gets actualPiece
+      b <- use board
+      return (getAny $ foldMap (Any . isFilled . (b !!!)) ps)
+
+(!!!) :: Board -> V2 Int -> Tile
+b !!! (V2 i j) = b ! (j,i)
+
 
 atBottom :: GameState -> GameState -> Bool
 atBottom old new =
@@ -125,8 +142,6 @@ overlaps new old =
   where
     go (Filled _) = Any True
     go _ = Any False
-    err = "at overlaps"
-                 -- foldMap (go . debugArrayIndex err oldboard) (zip cs rs)))
        -- then Just (getAny $ foldMap (go . (oldboard !)) (zip cs rs))
 
 freezePiece :: GameState -> GameState
@@ -138,8 +153,9 @@ freezePiece g =
       (V2 posc posr) = view (curpiece . pos) g
       rs = g ^.. curpiece . tiles . traverse . _x
       cs = g ^.. curpiece . tiles . traverse . _y
-      newboard =  cboard // (zipWith (\r c -> ((posc - c, posr - r), (Filled colour))) rs cs)
-      errnewboard = "at freezePiece"
+      newboard =
+        cboard //
+        (zipWith (\r c -> ((posc - c, posr - r), (Filled colour))) rs cs)
       (x, newGen1) = randomR (0, 6) $ view pieceGenerator g
       (c, newGen2) = randomR (0, 6) $ view pieceColourGenerator g
       newpiece = makePiece (toEnum x) position (toEnum c)
@@ -157,49 +173,48 @@ freezePiece g =
           else view status g)
        (view rotmap g)
        MNull
-      -- newboard = debugArraySet errnewboard cboard (zipWith (\r c -> ((posc - c, posr - r), (Filled colour))) rs cs)
       -- newboard = cboard // zipWith (\r c -> ((posc - c, posr - r), Filled)) rs cs
 
 inBoard :: ((Int, Int), (Int, Int)) -> M42 Int -> Bool
 inBoard b = getAll . foldMap go
   where
-    go = All . inRange b . fromV2
-    fromV2 (V2 a b) = (a, b)
+    go = All . inRange b . uncurry (flip (,)) . fromV2
+
+
+fromV2 (V2 a b) = (a, b)
+toV2 (a,b) = V2 a b
+
+-- rs = map (posr -) $ new ^.. curpiece . tiles . traverse . _x
+-- cs = map (posc -) $ new ^.. curpiece . tiles . traverse . _y
 
 actualPiece :: GameState -> M42 Int
-actualPiece g =
-  let (V2 pc pr) = view (curpiece . pos) g
-      ts = view (curpiece . tiles) g
-  in over (mapped . _y) ((-) pr) (over (mapped . _x) ((-) pc) ts)
+actualPiece = evalState go
+  where
+    go = do
+      (V2 pc pr) <- use (curpiece . pos)
+      ts <- use (curpiece . tiles)
+      return (over (mapped . _y) (pc -) (over (mapped . _x) (pr -) ts))
 
 gameover :: GameState -> GameState
-gameover g =
-  let b = view board g
-      ((_, bottomcolumn), (toprow, topcolumn)) = bounds $ b
-      cond =
-        or $
-        liftA2
-          (\r c -> isFilled $ b ! (r, c))
-          [toprow, toprow - 1, toprow - 2]
-          [bottomcolumn .. topcolumn]
-          --(\r c -> isFilled $ debugArrayIndex (errgameover ++ " cond") b (r, c))
-             -- cond = or $ liftA2 (\r c -> Filled == b ! (r,c)) [toprow, toprow - 1 , toprow - 2] [bottomcolumn .. topcolumn]
-  in if cond
-       then set status Done g
-       else g
+gameover = execState go
+  where
+    go = do
+      b <- use board
+      let ((_, bc), (tr, tc)) = bounds b
+      when
+        (or $
+         liftA2 (\r c -> isFilled $ b ! (r, c)) [tr, tr - 1, tr - 2] [bc .. tc])
+        (status .= Done)
 
-checkgameover g =
-  let b = view board g
-      ((_, bottomcolumn), (toprow, topcolumn)) = bounds $ b
-  in or $
-     liftA2
-       (\r c -> isFilled $ b ! (r, c))
-       [toprow, toprow - 1, toprow - 2]
-       [bottomcolumn .. topcolumn]
-         -- in or $ liftA2 (\r c -> Filled == b ! (r,c)) [toprow, toprow - 1 , toprow - 2] [bottomcolumn .. topcolumn]
-       -- (\r c -> isFilled $ debugArrayIndex (errgameover ++ " liftA2") b (r, c))
+checkgameover = evalState go
+  where
+    go = do
+      b <- use board
+      let ((_, bc), (tr, tc)) = bounds b
+      return
+        (or $
+         liftA2 (\r c -> isFilled $ b ! (r, c)) [tr, tr - 1, tr - 2] [bc .. tc])
 
-errgameover = "at gameover"
 
 togglePause :: GameState -> GameState
 togglePause g =
@@ -376,4 +391,4 @@ unsafeMovePieceVerticallyDown = over (pos . _x) pred
 
 defaultGameState =
   let gen = mkStdGen 0
-  in GameState defaultBoard 0 gen gen (makePiece L (V2 15 7) CWhite) Running
+  in GameState defaultBoard 0 gen gen (makePiece I (V2 15 7) CWhite) Running
